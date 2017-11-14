@@ -1,3 +1,8 @@
+function changes(node1, node2) {
+  return (typeof node1 === 'string' && node1 !== node2) ||
+         node1.get('tag') !== node2.get('tag')
+}
+
 function updateElement(dom, newTree, tree, index) {
   if (index === undefined) {
     index = 0
@@ -5,18 +10,24 @@ function updateElement(dom, newTree, tree, index) {
 
   if (!tree) {
     dom.appendChild(
-      createElement(newTree)
+      create(newTree)
     )
   } else if (!newTree) {
     dom.removeChild(
       dom.childNodes[index]
     )
-  } else if (newTree !== tree) {
+  } else if (changes(tree, newTree)) {
     dom.replaceChild(
       create(newTree),
       dom.childNodes[index]
     )
-  } else if (newTree.tag) {
+  } else if (newTree.get('tag')) {
+    var same = newTree.get('children').equals(tree.get('children'))
+
+    if (same) {
+      return
+    }
+
     var newLength = newTree.get('children').count()
     var oldLength = tree.get('children').count()
 
@@ -55,12 +66,18 @@ function h(tag, props, children) {
 }
 
 function render(state) {
+  var list = []
+  for (var i = 0, len = state.get('count'); i < len; ++i) {
+    list.push(h('li', {}, ['stuff']))
+  }
+
   return h('div', {
     style: {
       color: 'red'
     }
   }, [
-    h('h1', {}, [String(state.get('count'))])
+    //h('h1', {}, [String(state.get('count'))]),
+    h('ul', {}, list)
   ])
 }
 
@@ -88,17 +105,14 @@ var ninjaRoot = document.getElementById('ninja-root')
 ninjaRoot.innerHTML = ''
 ninjaRoot.appendChild(create(tree))
 
-setTimeout(function renderLoop() {
+function update() {
   var newState = reducer(state, { type: 'INC' })
+
   if (newState !== state) {
     state = newState
 
     var newTree = render(state)
-
-    if (newTree !== tree) {
-      updateElement(ninjaRoot, newTree, tree)
-      tree = newTree
-    }
+    updateElement(ninjaRoot, newTree, tree)
+    tree = newTree
   }
-  setTimeout(renderLoop, 0)
-}, 0)
+}
