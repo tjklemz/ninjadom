@@ -3,41 +3,59 @@ function changes(node1, node2) {
          node1.get('tag') !== node2.get('tag')
 }
 
-function updateElement(dom, newTree, tree, index) {
+function updateElement(parent, newTree, tree, index) {
   if (index === undefined) {
     index = 0
   }
 
   if (!tree) {
-    dom.appendChild(
+    parent.appendChild(
       create(newTree)
     )
   } else if (!newTree) {
-    dom.removeChild(
-      dom.childNodes[index]
+    parent.removeChild(
+      parent.childNodes[index]
     )
   } else if (changes(tree, newTree)) {
-    dom.replaceChild(
+    parent.replaceChild(
       create(newTree),
-      dom.childNodes[index]
+      parent.childNodes[index]
     )
   } else if (newTree.get('tag')) {
     var same = newTree.get('children').equals(tree.get('children'))
 
-    if (same) {
-      return
+    if (!same) {
+      var newLength = newTree.get('children').count()
+      var oldLength = tree.get('children').count()
+
+      for (var i = 0; i < newLength || i < oldLength; i++) {
+        updateElement(
+          parent.childNodes[index],
+          newTree.getIn(['children', i]),
+          tree.getIn(['children', i]),
+          i
+        )
+        rebind(parent.childNodes[index], tree, newTree)
+      }
     }
+  }
+}
 
-    var newLength = newTree.get('children').count()
-    var oldLength = tree.get('children').count()
+function rebind(el, tree, newTree) {
+  var oldProps = tree && tree.get && tree.get('props')
 
-    for (var i = 0; i < newLength || i < oldLength; i++) {
-      updateElement(
-        dom.childNodes[index],
-        newTree.getIn(['children', i]),
-        tree.getIn(['children', i]),
-        i
-      );
+  if (newTree && newTree.get && !newTree.get('props').equals(oldProps)) {
+    // rebind props
+    newTree.get('props').forEach(bind(el, oldProps))
+  }
+}
+
+function bind(el, old) {
+  return function (value, key) {
+    if (key.startsWith('on')) {
+      var name = key.replace(/^on/, '').toLowerCase()
+      old && el.removeEventListener(name, old.get(key))
+      el.addEventListener(name, value)
     }
   }
 }
@@ -48,6 +66,8 @@ function create(tree) {
   }
 
   var el =  document.createElement(tree.get('tag'))
+
+  tree.get('props').forEach(bind(el, null))
 
   tree.get('children').forEach(function (child) {
     if (typeof child === 'string') {
@@ -80,7 +100,12 @@ function render(state) {
       color: 'red'
     }
   }, [
-    h('h1', {}, [String(state.get('count'))]),
+    h('h1', {
+      count: state.get('count'),
+      'onClick': function (event) {
+        console.log('hiya', state.get('count'))
+      }
+    }, [String(state.get('count'))]),
     h('ul', {}, list)
   ])
 }
@@ -107,7 +132,7 @@ var tree = render(state)
 
 var ninjaRoot = document.getElementById('ninja-root')
 ninjaRoot.innerHTML = ''
-ninjaRoot.appendChild(create(tree))
+updateElement(ninjaRoot, tree)
 
 function update() {
   var newState = reducer(state, { type: 'INC' })
