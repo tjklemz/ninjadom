@@ -43,7 +43,11 @@ function updateElement(dom, newTree, tree, index) {
 }
 
 function create(tree) {
-  var el = document.createElement(tree.get('tag'))
+  if (typeof tree === 'string') {
+    return document.createTextNode(tree)
+  }
+
+  var el =  document.createElement(tree.get('tag'))
 
   tree.get('children').forEach(function (child) {
     if (typeof child === 'string') {
@@ -76,7 +80,7 @@ function render(state) {
       color: 'red'
     }
   }, [
-    //h('h1', {}, [String(state.get('count'))]),
+    h('h1', {}, [String(state.get('count'))]),
     h('ul', {}, list)
   ])
 }
