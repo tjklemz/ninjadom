@@ -1,3 +1,36 @@
+function updateElement(dom, newTree, tree, index) {
+  if (index === undefined) {
+    index = 0
+  }
+
+  if (!tree) {
+    dom.appendChild(
+      createElement(newTree)
+    )
+  } else if (!newTree) {
+    dom.removeChild(
+      dom.childNodes[index]
+    )
+  } else if (newTree !== tree) {
+    dom.replaceChild(
+      create(newTree),
+      dom.childNodes[index]
+    )
+  } else if (newTree.tag) {
+    var newLength = newTree.get('children').count()
+    var oldLength = tree.get('children').count()
+
+    for (var i = 0; i < newLength || i < oldLength; i++) {
+      updateElement(
+        dom.childNodes[index],
+        newTree.getIn(['children', i]),
+        tree.getIn(['children', i]),
+        i
+      );
+    }
+  }
+}
+
 function create(tree) {
   var el = document.createElement(tree.get('tag'))
 
@@ -17,7 +50,7 @@ function h(tag, props, children) {
   return Immutable.Map({
     tag: tag,
     props: Immutable.Map(props),
-    children: children && Immutable.List(children)
+    children: Immutable.List(children)
   })
 }
 
@@ -51,21 +84,21 @@ function reducer(state, action) {
 var state = reducer(null, {})
 var tree = render(state)
 
-var dom = create(tree)
-
 var ninjaRoot = document.getElementById('ninja-root')
 ninjaRoot.innerHTML = ''
-ninjaRoot.appendChild(dom)
+ninjaRoot.appendChild(create(tree))
 
 setTimeout(function renderLoop() {
   var newState = reducer(state, { type: 'INC' })
   if (newState !== state) {
     state = newState
 
-    var tree = render(state)
-    dom = create(tree)
-    ninjaRoot.innerHTML = ''
-    ninjaRoot.appendChild(dom)
+    var newTree = render(state)
+
+    if (newTree !== tree) {
+      updateElement(ninjaRoot, newTree, tree)
+      tree = newTree
+    }
   }
-  setTimeout(renderLoop, 1500)
-}, 1500)
+  setTimeout(renderLoop, 0)
+}, 0)
