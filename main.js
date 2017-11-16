@@ -1,147 +1,74 @@
-function changes(node1, node2) {
-  return (typeof node1 === 'string' && node1 !== node2) ||
-         node1.get('tag') !== node2.get('tag')
+function addTodo(title) {
+  return { type: 'ADD_TODO', title: title }
 }
 
-function updateElement(parent, newTree, tree, index) {
-  if (index === undefined) {
-    index = 0
-  }
-
-  if (!tree) {
-    parent.appendChild(
-      create(newTree)
-    )
-  } else if (!newTree) {
-    parent.removeChild(
-      parent.childNodes[index]
-    )
-  } else if (changes(tree, newTree)) {
-    parent.replaceChild(
-      create(newTree),
-      parent.childNodes[index]
-    )
-  } else if (newTree.get('tag')) {
-    var same = newTree.get('children').equals(tree.get('children'))
-
-    if (!same) {
-      var newLength = newTree.get('children').count()
-      var oldLength = tree.get('children').count()
-
-      for (var i = 0; i < newLength || i < oldLength; i++) {
-        updateElement(
-          parent.childNodes[index],
-          newTree.getIn(['children', i]),
-          tree.getIn(['children', i]),
-          i
-        )
-        rebind(parent.childNodes[index], tree, newTree)
-      }
-    }
-  }
-}
-
-function rebind(el, tree, newTree) {
-  var oldProps = tree && tree.get && tree.get('props')
-
-  if (newTree && newTree.get && !newTree.get('props').equals(oldProps)) {
-    // rebind props
-    newTree.get('props').forEach(bind(el, oldProps))
-  }
-}
-
-function bind(el, old) {
-  return function (value, key) {
-    if (key.startsWith('on')) {
-      var name = key.replace(/^on/, '').toLowerCase()
-      old && el.removeEventListener(name, old.get(key))
-      el.addEventListener(name, value)
-    }
-  }
-}
-
-function create(tree) {
-  if (typeof tree === 'string') {
-    return document.createTextNode(tree)
-  }
-
-  var el =  document.createElement(tree.get('tag'))
-
-  tree.get('props').forEach(bind(el, null))
-
-  tree.get('children').forEach(function (child) {
-    if (typeof child === 'string') {
-      el.appendChild(document.createTextNode(child))
-      return
-    }
-
-    el.appendChild(create(child))
-  })
-
-  return el
-}
-
-function h(tag, props, children) {
-  return Immutable.Map({
-    tag: tag,
-    props: Immutable.Map(props),
-    children: Immutable.List(children)
-  })
+function removeTodo(index) {
+  return { type: 'REMOVE_TODO', index: index }
 }
 
 function render(state) {
-  var list = []
-  for (var i = 0, len = state.get('count'); i < len; ++i) {
-    list.push(h('li', {}, ['stuff']))
-  }
+  var list = state.map(function (todo, i) {
+    return h('li', {
+      key: todo.get('id')
+    }, [
+      todo.get('title'),
+      h('span', {
+        index: todo.get('id')
+      }, ['X'])])
+  })
 
-  return h('div', {
-    style: {
-      color: 'red'
-    }
-  }, [
-    h('h1', {
-      count: state.get('count'),
-      'onClick': function (event) {
-        console.log('hiya', state.get('count'))
+  return h('div', {}, [
+    h('h1', {}, ['Todo List']),
+    h('input', {
+      'onChange': function (event) {
+        dispatch(addTodo(event.target.value))
       }
-    }, [String(state.get('count'))]),
-    h('ul', {}, list)
+    }),
+    h('button', {
+      'onClick': function (event) {
+        event.preventDefault()
+        console.log('yoyo')
+        dispatch({ type: 'INC' })
+      }
+    }, ["Click Me!"]),
+    h('ul', {
+      onClick: function (event) {
+        event.preventDefault()
+
+        var i = event.target.dataset.index
+
+        console.log('SDF', event.target, this, i)
+        
+        dispatch(removeTodo(i))
+      }
+    }, list)
   ])
 }
 
 function reducer(state, action) {
   if (!state) {
-    state = Immutable.Map({
-      count: 0
-    })
+    state = Immutable.List()
   }
 
   switch (action.type) {
-    case 'INC':
-      return state.set('count', state.get('count') + 1)
-    case 'DEC':
-      return state.set('count', state.get('count') - 1)
+    case 'ADD_TODO':
+      return state.push(Immutable.Map({
+        title: action.title,
+        id: shortid.gen()
+      }))
+    case 'REMOVE_TODO':
+      var index = state.findIndex(function (val) {
+        return val.get('id') === action.index
+      })
+      return state.delete(index)
     default:
       return state
   }
 }
 
-var state = reducer(null, {})
-var tree = render(state)
+ninja(document.getElementById('ninja-root'))
 
-var ninjaRoot = document.getElementById('ninja-root')
-ninjaRoot.innerHTML = ''
-updateElement(ninjaRoot, tree)
-
-function update() {
-  var newState = reducer(state, { type: 'INC' })
-
-  if (newState !== state) {
-    state = newState
-
-    var newTree = render(state)
-    updateElement(ninjaRoot, newTree, tree)
-    tree = newTree
-  }
+for (var i = 0; i < 1000; ++i) {
+  dispatch(addTodo('For you: ' + i + ' - ' + (new Date())))
 }
+
